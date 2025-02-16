@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Model Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r132/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        canvas { display: block; }
+        #controls { position: absolute; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.5); color: white; padding: 10px; }
+        button { margin: 5px; padding: 8px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <button onclick="prevModel()">Previous Model</button>
+        <button onclick="nextModel()">Next Model</button>
+        <input type="file" id="fileInput" accept=".glb" />
+    </div>
+
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        document.body.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        const loader = new THREE.GLTFLoader();
+        let currentModel;
+        let modelIndex = 0;
+        let models = [];
+
+        function fetchModels() {
+            fetch('/models')
+                .then(response => response.json())
+                .then(data => {
+                    models = data.map(model => `/static/${model}`);
+                    if (models.length > 0) {
+                        loadModel(models[0]);
+                    }
+                })
+                .catch(error => console.error("Error fetching models:", error));
+        }
+
+        function loadModel(modelPath) {
+            if (currentModel) scene.remove(currentModel);
+            loader.load(modelPath, function (gltf) {
+                currentModel = gltf.scene;
+
+                // Scale the model (Increase values if it's still too small)
+                currentModel.scale.set(2, 2, 2);
+
+                scene.add(currentModel);
+                adjustCamera(gltf.scene);
+            });
+        }
+
+        function adjustCamera(model) {
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            camera.position.set(center.x, center.y, center.z + 2);
+            camera.lookAt(center);
+        }
+
+        function prevModel() {
+            if (models.length > 0) {
+                modelIndex = (modelIndex - 1 + models.length) % models.length;
+                loadModel(models[modelIndex]);
+            }
+        }
+
+        function nextModel() {
+            if (models.length > 0) {
+                modelIndex = (modelIndex + 1) % models.length;
+                loadModel(models[modelIndex]);
+            }
+        }
+
+        document.getElementById('fileInput').addEventListener('change', function (event) {
+            const file = event.target.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                models.push(url);
+                modelIndex = models.length - 1;
+                loadModel(url);
+            }
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        fetchModels();
+    </script>
+</body>
+</html>
