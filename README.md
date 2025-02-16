@@ -1,4 +1,4 @@
-# 3D Model Viewer Documentation
+# 3D Model Viewer
 
 ## Overview
 This project is a **web-based 3D model viewer** built using **Three.js**. It allows users to:
